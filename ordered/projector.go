@@ -1,4 +1,4 @@
-package eventsourcing
+package ordered
 
 import (
 	"context"
@@ -12,16 +12,29 @@ import (
 )
 
 // DefaultTimeout is the default timeout to use when applying an event.
-//
-// This can be overridden for specific handlers or messages by implementing
-// dogma.ProjectionMessageHandler.TimeoutHint().
-const DefaultTimeout = 1 * time.Second
+const DefaultTimeout = 3 * time.Second
 
 // Projector reads events from a stream and applies them to a projection.
 type Projector struct {
-	Stream  Stream
+	// Stream is the stream used to obtain event messages.
+	Stream Stream
+
+	// Handler is the Dogma projection handler that the messages are applied to.
 	Handler dogma.ProjectionMessageHandler
-	Log     func(string, ...interface{})
+
+	// Log is a printf-style function used to write log messages about the
+	// behavior of the projector. If it is nil no logs are written.
+	Log func(string, ...interface{})
+
+	// HandlerLog is a printf-style function used to write application-defined
+	// log messages produced within the handler by calling
+	// dogma.ProjectionEventScope.Log(). If it is nil no logs are written.
+	HandlerLog func(string, ...interface{})
+
+	// DefaultTimeout is the timeout duration to use when hanlding an event if
+	// the handler does not provide a timeout hint. If it is zero the global
+	// DefaultTimeout constant is used.
+	DefaultTimeout time.Duration
 
 	config   *config.ProjectionConfig
 	resource []byte
@@ -30,6 +43,11 @@ type Projector struct {
 }
 
 // Run applies events to a projection until ctx is canceled or an error occurs.
+//
+// If message handling fails due to an optimistic concurrency conflict within
+// the projection the consumer restarts automatically. Any other error is
+// returned, in which case it is the caller's responsible to implement any retry
+// logic. Run() can safely be called again after exiting with an error.
 func (p *Projector) Run(ctx context.Context) error {
 	cfg, err := config.NewProjectionConfig(p.Handler)
 	if err != nil {
@@ -120,7 +138,7 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 
 	ok, err := p.Handler.HandleEvent(
 		ctx,
-		[]byte(env.StreamName),
+		p.resource,
 		p.current,
 		p.next,
 		scope{
@@ -140,6 +158,11 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 // does not provide a hint.
 func (p *Projector) withTimeout(ctx context.Context, m dogma.Message) (context.Context, func()) {
 	t := p.Handler.TimeoutHint(m)
+
+	if t == 0 {
+		t = p.DefaultTimeout
+	}
+
 	if t == 0 {
 		t = DefaultTimeout
 	}

@@ -1,9 +1,10 @@
-package eventsourcing
+package ordered
 
 import (
 	"time"
 
 	"github.com/dogmatiq/dogma"
+	"github.com/dogmatiq/enginekit/identity"
 )
 
 var _ dogma.ProjectionEventScope = &scope{}
@@ -12,6 +13,9 @@ var _ dogma.ProjectionEventScope = &scope{}
 //
 // It is used by Projector when invoking the projection handler.
 type scope struct {
+	stream     string
+	handler    identity.Identity
+	env        *Envelope
 	recordedAt time.Time
 	log        func(string, ...interface{})
 }

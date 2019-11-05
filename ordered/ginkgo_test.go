@@ -1,4 +1,4 @@
-package eventsourcing_test
+package ordered_test
 
 import (
 	"reflect"

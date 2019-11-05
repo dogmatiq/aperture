@@ -1,4 +1,4 @@
-package eventsourcing
+package ordered
 
 import (
 	"context"
@@ -21,11 +21,7 @@ type Stream interface {
 	//
 	// types is a set of zero-value event messages, the types of which indicate
 	// which event types the cursor exposes.
-	Open(
-		ctx context.Context,
-		offset uint64,
-		types []dogma.Message,
-	) (Cursor, error)
+	Open(ctx context.Context, offset uint64, types []dogma.Message) (Cursor, error)
 }
 
 // A Cursor reads events from a stream.
@@ -46,8 +42,12 @@ type Cursor interface {
 
 // Envelope is a container for an event on a stream.
 type Envelope struct {
-	StreamName string
-	Offset     uint64
+	// Offset is the zero-based offset of the message on the stream.
+	Offset uint64
+
+	// RecordedAt is the time at which the event occurred.
 	RecordedAt time.Time
-	Message    dogma.Message
+
+	// Message is the application-defined message.
+	Message dogma.Message
 }
