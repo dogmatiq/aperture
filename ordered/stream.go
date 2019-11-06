@@ -3,11 +3,11 @@ package ordered
 import (
 	"context"
 	"errors"
-	"reflect"
 	"sync"
 	"time"
 
 	"github.com/dogmatiq/dogma"
+	"github.com/dogmatiq/enginekit/message"
 )
 
 // A Stream is an ordered sequence of event messages.
@@ -95,11 +95,7 @@ func (s *MemoryStream) Open(
 	}
 
 	if len(filter) > 0 {
-		c.filter = map[reflect.Type]struct{}{}
-		for _, m := range filter {
-			rt := reflect.TypeOf(m)
-			c.filter[rt] = struct{}{}
-		}
+		c.filter = message.TypesOf(filter...)
 	}
 
 	return c, nil
@@ -125,7 +121,7 @@ func (s *MemoryStream) Append(t time.Time, messages ...dogma.Message) {
 type memoryCursor struct {
 	stream *MemoryStream
 	offset uint64
-	filter map[reflect.Type]struct{}
+	filter message.TypeSet
 	closed chan struct{}
 }
 
@@ -180,11 +176,8 @@ func (c *memoryCursor) get() (Envelope, <-chan struct{}) {
 		env := c.stream.messages[c.offset]
 		c.offset++
 
-		if c.filter != nil {
-			rt := reflect.TypeOf(env.Message)
-			if _, ok := c.filter[rt]; !ok {
-				continue
-			}
+		if c.filter != nil && !c.filter.HasM(env.Message) {
+			continue
 		}
 
 		return env, nil
