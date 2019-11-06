@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/dogmatiq/dodeca/logging"
 	"github.com/dogmatiq/dogma"
 	"github.com/dogmatiq/enginekit/config"
 )
@@ -22,14 +23,9 @@ type Projector struct {
 	// Handler is the Dogma projection handler that the messages are applied to.
 	Handler dogma.ProjectionMessageHandler
 
-	// Log is a printf-style function used to write log messages about the
-	// behavior of the projector. If it is nil no logs are written.
-	Log func(string, ...interface{})
-
-	// HandlerLog is a printf-style function used to write application-defined
-	// log messages produced within the handler by calling
-	// dogma.ProjectionEventScope.Log(). If it is nil no logs are written.
-	HandlerLog func(string, ...interface{})
+	// Logger is the target for log messages from the projector and the handler.
+	// If it is nil, logging.DefaultLogger is used.
+	Logger logging.Logger
 
 	// DefaultTimeout is the timeout duration to use when hanlding an event if
 	// the handler does not provide a timeout hint. If it is zero the global
@@ -60,13 +56,17 @@ func (p *Projector) Run(ctx context.Context) error {
 
 	for {
 		if err := p.consume(ctx); err != nil {
-			return fmt.Errorf(
-				"unable to consume from the '%s' stream for the '%s' (%s) projection: %w",
-				p.Stream.ID(),
-				p.config.HandlerIdentity.Name,
-				p.config.HandlerIdentity.Key,
-				err,
-			)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				return fmt.Errorf(
+					"unable to consume from '%s' for the '%s' projection: %w",
+					p.Stream.ID(),
+					p.config.HandlerIdentity.Name,
+					err,
+				)
+			}
 		}
 	}
 }
@@ -96,7 +96,7 @@ func (p *Projector) consume(ctx context.Context) error {
 func (p *Projector) open(ctx context.Context) (Cursor, error) {
 	var types []dogma.Message
 	for t := range p.config.ConsumedMessageTypes() {
-		types = append(types, reflect.Zero(t.ReflectType()))
+		types = append(types, reflect.Zero(t.ReflectType()).Interface())
 	}
 
 	var err error
@@ -115,19 +115,18 @@ func (p *Projector) open(ctx context.Context) (Cursor, error) {
 		offset = binary.BigEndian.Uint64(p.current) + 1
 	default:
 		return nil, fmt.Errorf(
-			"the persisted version is %d bytes in length, expected 0 or 8",
+			"the persisted version is %d byte(s), expected 0 or 8",
 			len(p.current),
 		)
 	}
 
-	if p.Log != nil {
-		p.Log(
-			"[%s %s@%d] started consuming",
-			p.config.HandlerIdentity.Name,
-			p.resource,
-			offset,
-		)
-	}
+	logging.Log(
+		p.Logger,
+		"[%s %s@%d] started consuming",
+		p.config.HandlerIdentity.Name,
+		p.resource,
+		offset,
+	)
 
 	return p.Stream.Open(ctx, offset, types)
 }
@@ -155,7 +154,7 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 			offset:     env.Offset,
 			handler:    p.config.HandlerIdentity.Name,
 			recordedAt: env.RecordedAt,
-			log:        p.Log,
+			logger:     p.Logger,
 		},
 		env.Message,
 	)
@@ -164,8 +163,9 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 		return false, err
 	}
 
-	if !ok && p.Log != nil {
-		p.Log(
+	if !ok {
+		logging.Log(
+			p.Logger,
 			"[%s %s@%d] an optimisitic concurrency conflict occurred, restarting the consumer",
 			p.config.HandlerIdentity.Name,
 			p.resource,
