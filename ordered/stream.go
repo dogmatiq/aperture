@@ -134,6 +134,8 @@ var errCursorClosed = errors.New("cursor is closed")
 func (c *memoryCursor) Next(ctx context.Context) (Envelope, error) {
 	for {
 		select {
+		case <-ctx.Done():
+			return Envelope{}, ctx.Err()
 		case <-c.closed:
 			return Envelope{}, errCursorClosed
 		default:
