@@ -120,6 +120,15 @@ func (p *Projector) open(ctx context.Context) (Cursor, error) {
 		)
 	}
 
+	if p.Log != nil {
+		p.Log(
+			"[%s %s@%d] started consuming",
+			p.config.HandlerIdentity.Name,
+			p.resource,
+			offset,
+		)
+	}
+
 	return p.Stream.Open(ctx, offset, types)
 }
 
@@ -142,11 +151,27 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 		p.current,
 		p.next,
 		scope{
+			resource:   p.resource,
+			offset:     env.Offset,
+			handler:    p.config.HandlerIdentity.Name,
 			recordedAt: env.RecordedAt,
 			log:        p.Log,
 		},
 		env.Message,
 	)
+
+	if err != nil {
+		return false, err
+	}
+
+	if !ok && p.Log != nil {
+		p.Log(
+			"[%s %s@%d] an optimisitic concurrency conflict occurred, restarting the consumer",
+			p.config.HandlerIdentity.Name,
+			p.resource,
+			env.Offset,
+		)
+	}
 
 	p.current, p.next = p.next, p.current
 

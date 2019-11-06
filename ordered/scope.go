@@ -1,10 +1,10 @@
 package ordered
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/dogmatiq/dogma"
-	"github.com/dogmatiq/enginekit/identity"
 )
 
 var _ dogma.ProjectionEventScope = &scope{}
@@ -13,9 +13,9 @@ var _ dogma.ProjectionEventScope = &scope{}
 //
 // It is used by Projector when invoking the projection handler.
 type scope struct {
-	stream     string
-	handler    identity.Identity
-	env        *Envelope
+	resource   []byte
+	offset     uint64
+	handler    string
 	recordedAt time.Time
 	log        func(string, ...interface{})
 }
@@ -29,6 +29,12 @@ func (s scope) RecordedAt() time.Time {
 // that is being handled.
 func (s scope) Log(f string, v ...interface{}) {
 	if s.log != nil {
-		s.log(f, v...)
+		s.log(
+			"[%s %s@%d] %s",
+			s.handler,
+			s.resource,
+			s.offset,
+			fmt.Sprintf(f, v...),
+		)
 	}
 }
