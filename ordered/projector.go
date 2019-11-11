@@ -7,10 +7,14 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/dogmatiq/aperture/internal/tracing"
 	"github.com/dogmatiq/dodeca/logging"
 	"github.com/dogmatiq/dogma"
 	"github.com/dogmatiq/enginekit/config"
+	"github.com/dogmatiq/enginekit/message"
+	"go.opentelemetry.io/otel/api/core"
 	"go.opentelemetry.io/otel/api/metric"
+	"go.opentelemetry.io/otel/api/trace"
 )
 
 // DefaultTimeout is the default timeout to use when applying an event.
@@ -48,10 +52,17 @@ type Projector struct {
 	// recorded.
 	OffsetGauge *metric.Int64GaugeHandle
 
-	config   *config.ProjectionConfig
-	resource []byte
-	current  []byte
-	next     []byte
+	// Tracer is used to record tracing spans. If it is nil, no tracing is
+	// performed.
+	Tracer trace.Tracer
+
+	config     *config.ProjectionConfig
+	resource   []byte
+	current    []byte
+	next       []byte
+	nameAttr   core.KeyValue
+	keyAttr    core.KeyValue
+	streamAttr core.KeyValue
 }
 
 // Run applies events to a projection until ctx is canceled or an error occurs.
@@ -69,6 +80,10 @@ func (p *Projector) Run(ctx context.Context) error {
 	p.config = cfg
 	p.resource = []byte(p.Stream.ID())
 	p.next = make([]byte, 8)
+
+	p.nameAttr = tracing.HandlerName.String(cfg.HandlerIdentity.Name)
+	p.keyAttr = tracing.HandlerKey.String(cfg.HandlerIdentity.Key)
+	p.streamAttr = tracing.StreamID.String(p.Stream.ID())
 
 	for {
 		if err := p.consume(ctx); err != nil {
@@ -115,25 +130,48 @@ func (p *Projector) open(ctx context.Context) (Cursor, error) {
 		types = append(types, reflect.Zero(t.ReflectType()).Interface())
 	}
 
-	var err error
-	p.current, err = p.Handler.ResourceVersion(ctx, p.resource)
-	if err != nil {
-		return nil, err
-	}
-
 	var offset uint64
 
-	switch len(p.current) {
-	case 0:
-		p.current = make([]byte, 8)
-		offset = 0
-	case 8:
-		offset = binary.BigEndian.Uint64(p.current) + 1
-	default:
-		return nil, fmt.Errorf(
-			"the persisted version is %d byte(s), expected 0 or 8",
-			len(p.current),
-		)
+	if err := tracing.WithSpan(
+		ctx,
+		p.Tracer,
+		"query last offset",
+		func(ctx context.Context) error {
+			span := trace.CurrentSpan(ctx)
+			span.SetAttributes(
+				p.nameAttr,
+				p.keyAttr,
+				tracing.HandlerTypeProjectionAttr,
+				p.streamAttr,
+			)
+
+			var err error
+			p.current, err = p.Handler.ResourceVersion(ctx, p.resource)
+			if err != nil {
+				return err
+			}
+
+			switch len(p.current) {
+			case 0:
+				p.current = make([]byte, 8)
+				offset = 0
+			case 8:
+				offset = binary.BigEndian.Uint64(p.current) + 1
+			default:
+				return fmt.Errorf(
+					"the persisted version is %d byte(s), expected 0 or 8",
+					len(p.current),
+				)
+			}
+
+			span.SetAttributes(
+				tracing.StreamOffset.Uint64(offset),
+			)
+
+			return nil
+		},
+	); err != nil {
+		return nil, err
 	}
 
 	logging.Log(
@@ -160,22 +198,44 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 	ctx, cancel := p.withTimeout(ctx, env.Message)
 	defer cancel()
 
-	ok, err := p.Handler.HandleEvent(
-		ctx,
-		p.resource,
-		p.current,
-		p.next,
-		scope{
-			resource:   p.resource,
-			offset:     env.Offset,
-			handler:    p.config.HandlerIdentity.Name,
-			recordedAt: env.RecordedAt,
-			logger:     p.Logger,
-		},
-		env.Message,
-	)
+	mt := message.TypeOf(env.Message).String()
 
-	if err != nil {
+	var ok bool
+	if err := tracing.WithSpan(
+		ctx,
+		p.Tracer,
+		mt,
+		func(ctx context.Context) error {
+			trace.CurrentSpan(ctx).SetAttributes(
+				p.nameAttr,
+				p.keyAttr,
+				tracing.HandlerTypeProjectionAttr,
+				p.streamAttr,
+				tracing.StreamOffset.Uint64(env.Offset),
+				tracing.MessageType.String(mt),
+				tracing.MessageRoleEventAttr,
+				tracing.MessageDescription.String(message.Description(env.Message)),
+				tracing.MessageRecordedAt.String(env.RecordedAt.Format(time.RFC3339Nano)),
+			)
+
+			var err error
+			ok, err = p.Handler.HandleEvent(
+				ctx,
+				p.resource,
+				p.current,
+				p.next,
+				scope{
+					resource:   p.resource,
+					offset:     env.Offset,
+					handler:    p.config.HandlerIdentity.Name,
+					recordedAt: env.RecordedAt,
+					logger:     p.Logger,
+				},
+				env.Message,
+			)
+			return err
+		},
+	); err != nil {
 		return false, err
 	}
 
