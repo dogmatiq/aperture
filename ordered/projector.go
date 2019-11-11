@@ -10,6 +10,7 @@ import (
 	"github.com/dogmatiq/dodeca/logging"
 	"github.com/dogmatiq/dogma"
 	"github.com/dogmatiq/enginekit/config"
+	"go.opentelemetry.io/otel/api/metric"
 )
 
 // DefaultTimeout is the default timeout to use when applying an event.
@@ -31,6 +32,21 @@ type Projector struct {
 	// the handler does not provide a timeout hint. If it is zero the global
 	// DefaultTimeout constant is used.
 	DefaultTimeout time.Duration
+
+	// HandleTimeMeasure is the metric handle used to record the amount of time
+	// spent handling each message, in seconds. If it is nil, no metric is
+	// recorded.
+	HandleTimeMeasure *metric.Float64MeasureHandle
+
+	// ConflictCount is the metric handle used to record the number of OCC
+	// conflicts that occur while attempting to handle messages. If it is nil,
+	// no metric is recorded.
+	ConflictCount *metric.Int64CounterHandle
+
+	// OffsetGauge is the metric handle used to record last offset that was
+	// successfully applied to the projection. If it is nil, no metric is
+	// recorded.
+	OffsetGauge *metric.Int64GaugeHandle
 
 	config   *config.ProjectionConfig
 	resource []byte
@@ -163,19 +179,29 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 		return false, err
 	}
 
-	if !ok {
-		logging.Log(
-			p.Logger,
-			"[%s %s@%d] an optimisitic concurrency conflict occurred, restarting the consumer",
-			p.config.HandlerIdentity.Name,
-			p.resource,
-			env.Offset,
-		)
+	if ok {
+		p.current, p.next = p.next, p.current
+
+		if p.OffsetGauge != nil {
+			p.OffsetGauge.Set(ctx, int64(env.Offset))
+		}
+
+		return true, nil
 	}
 
-	p.current, p.next = p.next, p.current
+	logging.Log(
+		p.Logger,
+		"[%s %s@%d] an optimisitic concurrency conflict occurred, restarting the consumer",
+		p.config.HandlerIdentity.Name,
+		p.resource,
+		env.Offset,
+	)
 
-	return ok, err
+	if p.ConflictCount != nil {
+		p.ConflictCount.Add(ctx, 1)
+	}
+
+	return false, nil
 }
 
 // withTimeout returns a context with a deadline computed from the handler's

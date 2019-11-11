@@ -11,10 +11,12 @@ import (
 	"github.com/dogmatiq/enginekit/fixtures"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"go.opentelemetry.io/otel/api/metric"
 )
 
 var _ = Describe("type Projector", func() {
 	var (
+		meter   metric.NoopMeter
 		now     time.Time
 		ctx     context.Context
 		cancel  func()
@@ -54,15 +56,29 @@ var _ = Describe("type Projector", func() {
 
 		logger = &logging.BufferedLogger{}
 
+		handleTimeMeasure := meter.NewFloat64Measure("")
+		handleTimeMeasureHandle := handleTimeMeasure.AcquireHandle(nil)
+		conflictCount := meter.NewInt64Counter("")
+		conflictCountHandle := conflictCount.AcquireHandle(nil)
+		offsetGauge := meter.NewInt64Gauge("")
+		offsetGaugeHandle := offsetGauge.AcquireHandle(nil)
+
 		proj = &Projector{
-			Stream:  stream,
-			Handler: handler,
-			Logger:  logger,
+			Stream:            stream,
+			Handler:           handler,
+			Logger:            logger,
+			HandleTimeMeasure: &handleTimeMeasureHandle,
+			ConflictCount:     &conflictCountHandle,
+			OffsetGauge:       &offsetGaugeHandle,
 		}
 	})
 
 	AfterEach(func() {
 		cancel()
+
+		proj.HandleTimeMeasure.Release()
+		proj.ConflictCount.Release()
+		proj.OffsetGauge.Release()
 	})
 
 	Describe("func Run()", func() {
