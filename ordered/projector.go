@@ -219,6 +219,7 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 			)
 
 			var err error
+			start := time.Now()
 			ok, err = p.Handler.HandleEvent(
 				ctx,
 				p.resource,
@@ -233,6 +234,10 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 				},
 				env.Message,
 			)
+			if p.HandleTimeMeasure != nil {
+				p.HandleTimeMeasure.Record(ctx, time.Since(start).Seconds())
+			}
+
 			return err
 		},
 	); err != nil {
