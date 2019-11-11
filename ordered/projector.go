@@ -12,6 +12,7 @@ import (
 	"github.com/dogmatiq/dogma"
 	"github.com/dogmatiq/enginekit/config"
 	"github.com/dogmatiq/enginekit/message"
+	"github.com/dogmatiq/linger"
 	"go.opentelemetry.io/otel/api/core"
 	"go.opentelemetry.io/otel/api/metric"
 	"go.opentelemetry.io/otel/api/trace"
@@ -195,7 +196,12 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 
 	binary.BigEndian.PutUint64(p.next, env.Offset)
 
-	ctx, cancel := p.withTimeout(ctx, env.Message)
+	ctx, cancel := linger.ContextWithTimeout(
+		ctx,
+		p.Handler.TimeoutHint(env.Message),
+		p.DefaultTimeout,
+		DefaultTimeout,
+	)
 	defer cancel()
 
 	mt := message.TypeOf(env.Message).String()
@@ -267,21 +273,4 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 	}
 
 	return false, nil
-}
-
-// withTimeout returns a context with a deadline computed from the handler's
-// timeout hint for the given message, or from defaultTimeout if the handler
-// does not provide a hint.
-func (p *Projector) withTimeout(ctx context.Context, m dogma.Message) (context.Context, func()) {
-	t := p.Handler.TimeoutHint(m)
-
-	if t == 0 {
-		t = p.DefaultTimeout
-	}
-
-	if t == 0 {
-		t = DefaultTimeout
-	}
-
-	return context.WithTimeout(ctx, t)
 }
