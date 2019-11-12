@@ -6,6 +6,7 @@ require (
 	github.com/dogmatiq/dodeca v0.1.1
 	github.com/dogmatiq/dogma v0.6.0
 	github.com/dogmatiq/enginekit v0.8.0
+	github.com/dogmatiq/linger v0.1.0
 	github.com/onsi/ginkgo v1.10.3
 	github.com/onsi/gomega v1.7.1
 	go.opentelemetry.io/otel v0.1.0
