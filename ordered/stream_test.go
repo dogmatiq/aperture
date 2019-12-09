@@ -6,7 +6,7 @@ import (
 
 	. "github.com/dogmatiq/aperture/ordered"
 	"github.com/dogmatiq/dogma"
-	"github.com/dogmatiq/enginekit/fixtures"
+	. "github.com/dogmatiq/dogma/fixtures"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"golang.org/x/sync/errgroup"
@@ -30,10 +30,10 @@ var _ = Describe("type MemoryStream", func() {
 
 		stream.Append(
 			now,
-			fixtures.MessageA1,
-			fixtures.MessageB1,
-			fixtures.MessageA2,
-			fixtures.MessageB2,
+			MessageA1,
+			MessageB1,
+			MessageA2,
+			MessageB2,
 		)
 	})
 
@@ -59,7 +59,7 @@ var _ = Describe("type MemoryStream", func() {
 				Envelope{
 					2,
 					now,
-					fixtures.MessageA2,
+					MessageA2,
 				},
 			))
 
@@ -69,13 +69,13 @@ var _ = Describe("type MemoryStream", func() {
 				Envelope{
 					3,
 					now,
-					fixtures.MessageB2,
+					MessageB2,
 				},
 			))
 		})
 
 		It("applies the message type filter", func() {
-			cur, err := stream.Open(ctx, 0, []dogma.Message{fixtures.MessageA{}})
+			cur, err := stream.Open(ctx, 0, []dogma.Message{MessageA{}})
 			Expect(err).ShouldNot(HaveOccurred())
 			defer cur.Close()
 
@@ -85,7 +85,7 @@ var _ = Describe("type MemoryStream", func() {
 				Envelope{
 					0,
 					now,
-					fixtures.MessageA1,
+					MessageA1,
 				},
 			))
 
@@ -95,7 +95,7 @@ var _ = Describe("type MemoryStream", func() {
 				Envelope{
 					2,
 					now,
-					fixtures.MessageA2,
+					MessageA2,
 				},
 			))
 		})
@@ -109,7 +109,7 @@ var _ = Describe("type MemoryStream", func() {
 			fn := func() error {
 				defer GinkgoRecover()
 
-				cur, err := stream.Open(ctx, 4, []dogma.Message{fixtures.MessageB{}})
+				cur, err := stream.Open(ctx, 4, []dogma.Message{MessageB{}})
 				if err != nil {
 					return err
 				}
@@ -125,7 +125,7 @@ var _ = Describe("type MemoryStream", func() {
 					Envelope{
 						5,
 						now,
-						fixtures.MessageB3,
+						MessageB3,
 					},
 				))
 
@@ -137,8 +137,8 @@ var _ = Describe("type MemoryStream", func() {
 
 			<-barrier
 			<-barrier
-			stream.Append(now, fixtures.MessageA3)
-			stream.Append(now, fixtures.MessageB3)
+			stream.Append(now, MessageA3)
+			stream.Append(now, MessageB3)
 
 			err := g.Wait()
 			Expect(err).ShouldNot(HaveOccurred())
@@ -148,7 +148,7 @@ var _ = Describe("type MemoryStream", func() {
 	Describe("type memoryCursor", func() {
 		Describe("func Next()", func() {
 			It("returns an error if the cursor is already closed", func() {
-				cur, err := stream.Open(ctx, 4, []dogma.Message{fixtures.MessageB{}})
+				cur, err := stream.Open(ctx, 4, []dogma.Message{MessageB{}})
 				Expect(err).ShouldNot(HaveOccurred())
 
 				cur.Close()
@@ -158,7 +158,7 @@ var _ = Describe("type MemoryStream", func() {
 			})
 
 			It("returns an error if the cursor is closed while waiting", func() {
-				cur, err := stream.Open(ctx, 4, []dogma.Message{fixtures.MessageB{}})
+				cur, err := stream.Open(ctx, 4, []dogma.Message{MessageB{}})
 				Expect(err).ShouldNot(HaveOccurred())
 
 				barrier := make(chan struct{})
@@ -174,7 +174,7 @@ var _ = Describe("type MemoryStream", func() {
 			})
 
 			It("returns an error if the context is canceled while waiting", func() {
-				cur, err := stream.Open(ctx, 4, []dogma.Message{fixtures.MessageB{}})
+				cur, err := stream.Open(ctx, 4, []dogma.Message{MessageB{}})
 				Expect(err).ShouldNot(HaveOccurred())
 				defer cur.Close()
 

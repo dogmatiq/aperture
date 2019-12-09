@@ -1,8 +1,8 @@
 package tracing
 
 import (
-	"github.com/dogmatiq/enginekit/handler"
-	"github.com/dogmatiq/enginekit/message"
+	"github.com/dogmatiq/configkit"
+	"github.com/dogmatiq/configkit/message"
 	"go.opentelemetry.io/otel/api/key"
 )
 
@@ -43,7 +43,7 @@ var (
 var (
 	// HandlerTypeProjectionAttr is a span attribute with the HandlerType key
 	// set to "projection".
-	HandlerTypeProjectionAttr = HandlerType.String(handler.ProjectionType.String())
+	HandlerTypeProjectionAttr = HandlerType.String(configkit.ProjectionHandlerType.String())
 
 	// MessageRoleEventAttr is a span attribute with the
 	// MessageRole key set to "event".

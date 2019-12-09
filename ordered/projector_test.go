@@ -8,7 +8,7 @@ import (
 	. "github.com/dogmatiq/aperture/ordered"
 	"github.com/dogmatiq/dodeca/logging"
 	"github.com/dogmatiq/dogma"
-	"github.com/dogmatiq/enginekit/fixtures"
+	. "github.com/dogmatiq/dogma/fixtures"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"go.opentelemetry.io/otel/api/metric"
@@ -21,7 +21,7 @@ var _ = Describe("type Projector", func() {
 		ctx     context.Context
 		cancel  func()
 		stream  *MemoryStream
-		handler *fixtures.ProjectionMessageHandler
+		handler *ProjectionMessageHandler
 		logger  *logging.BufferedLogger
 		proj    *Projector
 	)
@@ -39,18 +39,18 @@ var _ = Describe("type Projector", func() {
 
 		stream.Append(
 			now,
-			fixtures.MessageA1,
-			fixtures.MessageB1,
-			fixtures.MessageA2,
-			fixtures.MessageB2,
-			fixtures.MessageA3,
-			fixtures.MessageB3,
+			MessageA1,
+			MessageB1,
+			MessageA2,
+			MessageB2,
+			MessageA3,
+			MessageB3,
 		)
 
-		handler = &fixtures.ProjectionMessageHandler{
+		handler = &ProjectionMessageHandler{
 			ConfigureFunc: func(c dogma.ProjectionConfigurer) {
 				c.Identity("<proj>", "<proj-key>")
-				c.ConsumesEventType(fixtures.MessageA{})
+				c.ConsumesEventType(MessageA{})
 			},
 		}
 
@@ -103,9 +103,9 @@ var _ = Describe("type Projector", func() {
 			Expect(err).To(Equal(context.Canceled))
 			Expect(messages).To(Equal(
 				[]dogma.Message{
-					fixtures.MessageA1,
-					fixtures.MessageA2,
-					fixtures.MessageA3,
+					MessageA1,
+					MessageA2,
+					MessageA3,
 				},
 			))
 		})
@@ -190,7 +190,7 @@ var _ = Describe("type Projector", func() {
 			handler.ConfigureFunc = nil
 			err := proj.Run(ctx)
 			Expect(err).To(MatchError(
-				"*fixtures.ProjectionMessageHandler.Configure() did not call ProjectionConfigurer.Identity()",
+				"*fixtures.ProjectionMessageHandler is configured without an identity, Identity() must be called exactly once within Configure()",
 			))
 		})
 
@@ -261,7 +261,7 @@ var _ = Describe("type Projector", func() {
 					_ dogma.ProjectionEventScope,
 					m dogma.Message,
 				) (bool, error) {
-					Expect(m).To(Equal(fixtures.MessageA3))
+					Expect(m).To(Equal(MessageA3))
 					cancel()
 					return true, nil
 				}
@@ -315,7 +315,7 @@ var _ = Describe("type Projector", func() {
 						_ dogma.ProjectionEventScope,
 						m dogma.Message,
 					) (bool, error) {
-						Expect(m).To(Equal(fixtures.MessageA3))
+						Expect(m).To(Equal(MessageA3))
 						cancel()
 						return true, nil
 					}
