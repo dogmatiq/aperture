@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dogmatiq/configkit/message"
 	"github.com/dogmatiq/dogma"
-	"github.com/dogmatiq/enginekit/message"
 )
 
 // A Stream is an ordered sequence of event messages.

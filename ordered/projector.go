@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/dogmatiq/aperture/internal/tracing"
+	"github.com/dogmatiq/configkit"
+	"github.com/dogmatiq/configkit/message"
 	"github.com/dogmatiq/dodeca/logging"
 	"github.com/dogmatiq/dogma"
-	"github.com/dogmatiq/enginekit/config"
-	"github.com/dogmatiq/enginekit/message"
 	"github.com/dogmatiq/linger"
 	"go.opentelemetry.io/otel/api/core"
 	"go.opentelemetry.io/otel/api/metric"
@@ -57,7 +57,8 @@ type Projector struct {
 	// performed.
 	Tracer trace.Tracer
 
-	config     *config.ProjectionConfig
+	name       string
+	types      message.TypeCollection
 	resource   []byte
 	current    []byte
 	next       []byte
@@ -72,18 +73,18 @@ type Projector struct {
 // the projection the consumer restarts automatically. Any other error is
 // returned, in which case it is the caller's responsible to implement any retry
 // logic. Run() can safely be called again after exiting with an error.
-func (p *Projector) Run(ctx context.Context) error {
-	cfg, err := config.NewProjectionConfig(p.Handler)
-	if err != nil {
-		return err
-	}
+func (p *Projector) Run(ctx context.Context) (err error) {
+	defer configkit.Recover(&err)
 
-	p.config = cfg
+	cfg := configkit.FromProjection(p.Handler)
+
+	p.name = cfg.Identity().Name
+	p.types = cfg.MessageTypes().Consumed
 	p.resource = []byte(p.Stream.ID())
 	p.next = make([]byte, 8)
 
-	p.nameAttr = tracing.HandlerName.String(cfg.HandlerIdentity.Name)
-	p.keyAttr = tracing.HandlerKey.String(cfg.HandlerIdentity.Key)
+	p.nameAttr = tracing.HandlerName.String(cfg.Identity().Name)
+	p.keyAttr = tracing.HandlerKey.String(cfg.Identity().Key)
 	p.streamAttr = tracing.StreamID.String(p.Stream.ID())
 
 	for {
@@ -95,7 +96,7 @@ func (p *Projector) Run(ctx context.Context) error {
 				return fmt.Errorf(
 					"unable to consume from '%s' for the '%s' projection: %w",
 					p.Stream.ID(),
-					p.config.HandlerIdentity.Name,
+					p.name,
 					err,
 				)
 			}
@@ -127,9 +128,10 @@ func (p *Projector) consume(ctx context.Context) error {
 // projection.
 func (p *Projector) open(ctx context.Context) (Cursor, error) {
 	var types []dogma.Message
-	for t := range p.config.ConsumedMessageTypes() {
+	p.types.Each(func(t message.Type) bool {
 		types = append(types, reflect.Zero(t.ReflectType()).Interface())
-	}
+		return true
+	})
 
 	var offset uint64
 
@@ -178,7 +180,7 @@ func (p *Projector) open(ctx context.Context) (Cursor, error) {
 	logging.Log(
 		p.Logger,
 		"[%s %s@%d] started consuming",
-		p.config.HandlerIdentity.Name,
+		p.name,
 		p.resource,
 		offset,
 	)
@@ -220,7 +222,7 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 				tracing.StreamOffset.Uint64(env.Offset),
 				tracing.MessageType.String(mt),
 				tracing.MessageRoleEventAttr,
-				tracing.MessageDescription.String(message.Description(env.Message)),
+				tracing.MessageDescription.String(dogma.DescribeMessage(env.Message)),
 				tracing.MessageRecordedAt.String(env.RecordedAt.Format(time.RFC3339Nano)),
 			)
 
@@ -234,7 +236,7 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 				scope{
 					resource:   p.resource,
 					offset:     env.Offset,
-					handler:    p.config.HandlerIdentity.Name,
+					handler:    p.name,
 					recordedAt: env.RecordedAt,
 					logger:     p.Logger,
 				},
@@ -263,7 +265,7 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 	logging.Log(
 		p.Logger,
 		"[%s %s@%d] an optimisitic concurrency conflict occurred, restarting the consumer",
-		p.config.HandlerIdentity.Name,
+		p.name,
 		p.resource,
 		env.Offset,
 	)
