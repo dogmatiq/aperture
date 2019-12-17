@@ -71,8 +71,8 @@ type Projector struct {
 //
 // If message handling fails due to an optimistic concurrency conflict within
 // the projection the consumer restarts automatically. Any other error is
-// returned, in which case it is the caller's responsible to implement any retry
-// logic. Run() can safely be called again after exiting with an error.
+// returned, in which case it is the caller's responsibility to implement any
+// retry logic. Run() can safely be called again after exiting with an error.
 func (p *Projector) Run(ctx context.Context) (err error) {
 	defer configkit.Recover(&err)
 
