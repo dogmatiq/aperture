@@ -18,7 +18,7 @@ func WithSpan(
 	fn func(context.Context) error,
 ) error {
 	if t == nil || t == noop {
-		t = trace.CurrentSpan(ctx).Tracer()
+		t = trace.SpanFromContext(ctx).Tracer()
 	}
 
 	return t.WithSpan(ctx, op, fn)

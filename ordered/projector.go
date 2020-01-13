@@ -21,6 +21,21 @@ import (
 // DefaultTimeout is the default timeout to use when applying an event.
 const DefaultTimeout = 3 * time.Second
 
+// ProjectorMetrics encapsulates the metrics collected by a Projector.
+type ProjectorMetrics struct {
+	// HandleTimeMeasure is the bound metric used to record the amount of time
+	// spent handling each message, in seconds.
+	HandleTimeMeasure metric.BoundFloat64Measure
+
+	// ConflictCount is the bound metric used to record the number of OCC
+	// conflicts that occur while attempting to handle messages.
+	ConflictCount metric.BoundInt64Counter
+
+	// OffsetGauge is the bound handle used to record last offset that was
+	// successfully applied to the projection.
+	OffsetGauge metric.BoundInt64Gauge
+}
+
 // Projector reads events from a stream and applies them to a projection.
 type Projector struct {
 	// Stream is the stream used to obtain event messages.
@@ -38,20 +53,9 @@ type Projector struct {
 	// DefaultTimeout constant is used.
 	DefaultTimeout time.Duration
 
-	// HandleTimeMeasure is the metric handle used to record the amount of time
-	// spent handling each message, in seconds. If it is nil, no metric is
-	// recorded.
-	HandleTimeMeasure *metric.Float64MeasureHandle
-
-	// ConflictCount is the metric handle used to record the number of OCC
-	// conflicts that occur while attempting to handle messages. If it is nil,
-	// no metric is recorded.
-	ConflictCount *metric.Int64CounterHandle
-
-	// OffsetGauge is the metric handle used to record last offset that was
-	// successfully applied to the projection. If it is nil, no metric is
-	// recorded.
-	OffsetGauge *metric.Int64GaugeHandle
+	// Metrics contains the metrics recorded by the projector. If it is nil no
+	// metrics are recorded.
+	Metrics *ProjectorMetrics
 
 	// Tracer is used to record tracing spans. If it is nil, no tracing is
 	// performed.
@@ -140,7 +144,7 @@ func (p *Projector) open(ctx context.Context) (Cursor, error) {
 		p.Tracer,
 		"query last offset",
 		func(ctx context.Context) error {
-			span := trace.CurrentSpan(ctx)
+			span := trace.SpanFromContext(ctx)
 			span.SetAttributes(
 				p.nameAttr,
 				p.keyAttr,
@@ -214,7 +218,7 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 		p.Tracer,
 		mt,
 		func(ctx context.Context) error {
-			trace.CurrentSpan(ctx).SetAttributes(
+			trace.SpanFromContext(ctx).SetAttributes(
 				p.nameAttr,
 				p.keyAttr,
 				tracing.HandlerTypeProjectionAttr,
@@ -242,8 +246,8 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 				},
 				env.Message,
 			)
-			if p.HandleTimeMeasure != nil {
-				p.HandleTimeMeasure.Record(ctx, time.Since(start).Seconds())
+			if p.Metrics != nil {
+				p.Metrics.HandleTimeMeasure.Record(ctx, time.Since(start).Seconds())
 			}
 
 			return err
@@ -255,8 +259,8 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 	if ok {
 		p.current, p.next = p.next, p.current
 
-		if p.OffsetGauge != nil {
-			p.OffsetGauge.Set(ctx, int64(env.Offset))
+		if p.Metrics != nil {
+			p.Metrics.OffsetGauge.Set(ctx, int64(env.Offset))
 		}
 
 		return true, nil
@@ -270,8 +274,8 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 		env.Offset,
 	)
 
-	if p.ConflictCount != nil {
-		p.ConflictCount.Add(ctx, 1)
+	if p.Metrics != nil {
+		p.Metrics.ConflictCount.Add(ctx, 1)
 	}
 
 	return false, nil

@@ -57,28 +57,27 @@ var _ = Describe("type Projector", func() {
 		logger = &logging.BufferedLogger{}
 
 		handleTimeMeasure := meter.NewFloat64Measure("")
-		handleTimeMeasureHandle := handleTimeMeasure.AcquireHandle(nil)
 		conflictCount := meter.NewInt64Counter("")
-		conflictCountHandle := conflictCount.AcquireHandle(nil)
 		offsetGauge := meter.NewInt64Gauge("")
-		offsetGaugeHandle := offsetGauge.AcquireHandle(nil)
 
 		proj = &Projector{
-			Stream:            stream,
-			Handler:           handler,
-			Logger:            logger,
-			HandleTimeMeasure: &handleTimeMeasureHandle,
-			ConflictCount:     &conflictCountHandle,
-			OffsetGauge:       &offsetGaugeHandle,
+			Stream:  stream,
+			Handler: handler,
+			Logger:  logger,
+			Metrics: &ProjectorMetrics{
+				HandleTimeMeasure: handleTimeMeasure.Bind(nil),
+				ConflictCount:     conflictCount.Bind(nil),
+				OffsetGauge:       offsetGauge.Bind(nil),
+			},
 		}
 	})
 
 	AfterEach(func() {
 		cancel()
 
-		proj.HandleTimeMeasure.Release()
-		proj.ConflictCount.Release()
-		proj.OffsetGauge.Release()
+		proj.Metrics.HandleTimeMeasure.Unbind()
+		proj.Metrics.ConflictCount.Unbind()
+		proj.Metrics.OffsetGauge.Unbind()
 	})
 
 	Describe("func Run()", func() {
