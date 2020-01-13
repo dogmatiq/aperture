@@ -3,6 +3,7 @@ package ordered
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -64,6 +65,7 @@ type MemoryStream struct {
 
 	m        sync.Mutex
 	ready    chan struct{}
+	first    uint64
 	next     uint64
 	messages []Envelope
 }
@@ -118,6 +120,36 @@ func (s *MemoryStream) Append(t time.Time, messages ...dogma.Message) {
 	}
 }
 
+// Truncate discards any events before the given offset.
+//
+// It returns the number of truncated events.
+//
+// It panics if the offset is greater than the total number of events appended
+// to the stream.
+func (s *MemoryStream) Truncate(offset uint64) uint64 {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	if offset > s.next {
+		panic(fmt.Sprintf(
+			"can not truncate stream to offset %d, next offset is %d",
+			offset,
+			s.next,
+		))
+	}
+
+	count := offset - s.first
+
+	if count <= 0 {
+		return 0
+	}
+
+	s.first = offset
+	s.messages = s.messages[count:]
+
+	return count
+}
+
 type memoryCursor struct {
 	stream *MemoryStream
 	offset uint64
@@ -141,10 +173,10 @@ func (c *memoryCursor) Next(ctx context.Context) (Envelope, error) {
 		default:
 		}
 
-		env, ready := c.get()
+		env, ready, err := c.get()
 
-		if ready == nil {
-			return env, nil
+		if err != nil || ready == nil {
+			return env, err
 		}
 
 		select {
@@ -170,24 +202,32 @@ func (c *memoryCursor) Close() error {
 	return nil
 }
 
-func (c *memoryCursor) get() (Envelope, <-chan struct{}) {
+func (c *memoryCursor) get() (Envelope, <-chan struct{}, error) {
 	c.stream.m.Lock()
 	defer c.stream.m.Unlock()
 
+	if c.offset < c.stream.first {
+		return Envelope{}, nil, fmt.Errorf(
+			"can not read truncated event at offset %d, the first available offset is %d",
+			c.offset,
+			c.stream.first,
+		)
+	}
+
 	for c.stream.next > c.offset {
-		env := c.stream.messages[c.offset]
+		env := c.stream.messages[c.offset-c.stream.first]
 		c.offset++
 
 		if c.filter != nil && !c.filter.HasM(env.Message) {
 			continue
 		}
 
-		return env, nil
+		return env, nil, nil
 	}
 
 	if c.stream.ready == nil {
 		c.stream.ready = make(chan struct{})
 	}
 
-	return Envelope{}, c.stream.ready
+	return Envelope{}, c.stream.ready, nil
 }
