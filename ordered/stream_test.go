@@ -220,6 +220,24 @@ var _ = Describe("type MemoryStream", func() {
 
 	Describe("type memoryCursor", func() {
 		Describe("func Next()", func() {
+			It("returns the correct message after truncation ", func() {
+				stream.Truncate(2)
+
+				cur, err := stream.Open(ctx, 2, nil)
+				Expect(err).ShouldNot(HaveOccurred())
+				defer cur.Close()
+
+				env, err := cur.Next(ctx)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(env).To(Equal(
+					Envelope{
+						2,
+						now,
+						MessageA2,
+					},
+				))
+			})
+
 			It("returns an error if the cursor is already closed", func() {
 				cur, err := stream.Open(ctx, 4, []dogma.Message{MessageB{}})
 				Expect(err).ShouldNot(HaveOccurred())
