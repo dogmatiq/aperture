@@ -85,7 +85,6 @@ func (p *Projector) Run(ctx context.Context) (err error) {
 	p.name = cfg.Identity().Name
 	p.types = cfg.MessageTypes().Consumed
 	p.resource = []byte(p.Stream.ID())
-	p.next = make([]byte, 8)
 
 	p.nameAttr = tracing.HandlerName.String(cfg.Identity().Name)
 	p.keyAttr = tracing.HandlerKey.String(cfg.Identity().Key)
@@ -160,7 +159,6 @@ func (p *Projector) open(ctx context.Context) (Cursor, error) {
 
 			switch len(p.current) {
 			case 0:
-				p.current = make([]byte, 8)
 				offset = 0
 			case 8:
 				offset = binary.BigEndian.Uint64(p.current) + 1
@@ -198,6 +196,10 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 	env, err := cur.Next(ctx)
 	if err != nil {
 		return false, err
+	}
+
+	if p.next == nil {
+		p.next = make([]byte, 8)
 	}
 
 	binary.BigEndian.PutUint64(p.next, env.Offset)
@@ -257,6 +259,7 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 	}
 
 	if ok {
+		// keep swapping between the two buffers to avoid repeat allocations
 		p.current, p.next = p.next, p.current
 
 		if p.Metrics != nil {
