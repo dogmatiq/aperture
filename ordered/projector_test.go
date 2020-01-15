@@ -131,7 +131,7 @@ var _ = Describe("type Projector", func() {
 			Expect(err).To(Equal(context.Canceled))
 		})
 
-		It("falls back to the projectors default timeout", func() {
+		It("falls back to the projector's default timeout", func() {
 			proj.DefaultTimeout = 500 * time.Millisecond
 
 			handler.HandleEventFunc = func(
@@ -286,6 +286,31 @@ var _ = Describe("type Projector", func() {
 					Expect(r).To(Equal([]byte("<id>")))
 					Expect(c).To(Equal([]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02}))
 					Expect(n).To(Equal([]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04}))
+					cancel()
+					return true, nil
+				}
+
+				err := proj.Run(ctx)
+				Expect(err).To(Equal(context.Canceled))
+			})
+
+			It("passes the correct resource and versions to the handler when the resource does not exist", func() {
+				handler.ResourceVersionFunc = func(
+					_ context.Context,
+					res []byte,
+				) ([]byte, error) {
+					return nil, nil
+				}
+
+				handler.HandleEventFunc = func(
+					_ context.Context,
+					r, c, n []byte,
+					_ dogma.ProjectionEventScope,
+					_ dogma.Message,
+				) (bool, error) {
+					Expect(r).To(Equal([]byte("<id>")))
+					Expect(c).To(BeEmpty())
+					Expect(n).To(Equal([]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}))
 					cancel()
 					return true, nil
 				}
