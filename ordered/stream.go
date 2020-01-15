@@ -61,6 +61,8 @@ type Envelope struct {
 //
 // It is intended primarily for testing.
 type MemoryStream struct {
+	// StreamID is a unique identifier for the stream, it must not be empty.
+	// The tuple of stream ID and event offset must uniquely identify a message.
 	StreamID string
 
 	m        sync.Mutex
@@ -74,6 +76,10 @@ type MemoryStream struct {
 //
 // The tuple of stream ID and event offset must uniquely identify a message.
 func (s *MemoryStream) ID() string {
+	if s.StreamID == "" {
+		panic("stream ID must not be empty")
+	}
+
 	return s.StreamID
 }
 

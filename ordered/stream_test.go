@@ -45,6 +45,14 @@ var _ = Describe("type MemoryStream", func() {
 		It("returns the stream ID", func() {
 			Expect(stream.ID()).To(Equal("<id>"))
 		})
+
+		It("panics if the stream ID is empty", func() {
+			stream.StreamID = ""
+
+			Expect(func() {
+				stream.ID()
+			}).To(Panic())
+		})
 	})
 
 	Describe("func Open()", func() {
