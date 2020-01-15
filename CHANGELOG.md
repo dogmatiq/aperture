@@ -11,9 +11,20 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## Added
+
+- Add `ordered.ErrStreamSealed`
+- Add `MemoryStream.Seal()`
+
 ## Changed
 
+- `Stream.Open()` and `Cursor.Next()` may now return `ErrStreamSealed`
 - `MemoryStream.ID()` will now panic if the `StreamID` field is empty
+- `MemoryStream.Append()` now panics if `Seal()` has been called
+
+## Fixed
+
+- Fixed unconditional OCC failure in `ordered.Projector`
 
 ## [0.2.0] - 2020-01-14
 
