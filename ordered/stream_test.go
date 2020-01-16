@@ -107,6 +107,23 @@ var _ = Describe("type MemoryStream", func() {
 				},
 			))
 		})
+
+		Context("when the stream is sealed", func() {
+			It("returns a cursor if the offset is already on the stream", func() {
+				stream.Seal()
+
+				cur, err := stream.Open(ctx, 3, []dogma.Message{MessageB{}})
+				Expect(err).ShouldNot(HaveOccurred())
+				cur.Close()
+			})
+
+			It("returns ErrStreamSealed if offset is beyond the end of the stream", func() {
+				stream.Seal()
+
+				_, err := stream.Open(ctx, 4, []dogma.Message{MessageB{}})
+				Expect(err).To(Equal(ErrStreamSealed))
+			})
+		})
 	})
 
 	Describe("func Append()", func() {
@@ -150,6 +167,14 @@ var _ = Describe("type MemoryStream", func() {
 
 			err := g.Wait()
 			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("panics if the stream is sealed", func() {
+			stream.Seal()
+
+			Expect(func() {
+				stream.Append(now, MessageA1)
+			}).To(Panic())
 		})
 	})
 
@@ -218,6 +243,13 @@ var _ = Describe("type MemoryStream", func() {
 		})
 	})
 
+	Describe("func Seal()", func() {
+		It("does not panic if called on an already-sealed stream", func() {
+			stream.Seal()
+			stream.Seal()
+		})
+	})
+
 	Describe("type memoryCursor", func() {
 		Describe("func Next()", func() {
 			It("returns the correct message after truncation ", func() {
@@ -279,6 +311,33 @@ var _ = Describe("type MemoryStream", func() {
 				_, err = cur.Next(ctx)
 				<-barrier
 				Expect(err).Should(HaveOccurred())
+			})
+
+			When("the stream is sealed", func() {
+				It("returns ErrStreamSealed if sealed before Next() is called", func() {
+					cur, err := stream.Open(ctx, 4, []dogma.Message{MessageB{}})
+					Expect(err).ShouldNot(HaveOccurred())
+					defer cur.Close()
+
+					stream.Seal()
+
+					_, err = cur.Next(ctx)
+					Expect(err).To(Equal(ErrStreamSealed))
+				})
+
+				It("returns ErrStreamSealed if sealed while Next() is blocking", func() {
+					cur, err := stream.Open(ctx, 4, []dogma.Message{MessageB{}})
+					Expect(err).ShouldNot(HaveOccurred())
+					defer cur.Close()
+
+					go func() {
+						time.Sleep(100 * time.Millisecond)
+						stream.Seal()
+					}()
+
+					_, err = cur.Next(ctx)
+					Expect(err).To(Equal(ErrStreamSealed))
+				})
 			})
 		})
 	})

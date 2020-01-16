@@ -11,7 +11,14 @@ import (
 	"github.com/dogmatiq/dogma"
 )
 
+// ErrStreamSealed is returned by Stream.Open() and Cursor.Next() to indicate
+// that a stream will never produce any more events.
+var ErrStreamSealed = errors.New("stream sealed")
+
 // A Stream is an ordered sequence of event messages.
+//
+// Stream implementations may optionally allow for streams to be marked as
+// "sealed", indicating that no new messages will appear on the stream.
 type Stream interface {
 	// ID returns a unique identifier for the stream.
 	//
@@ -20,8 +27,9 @@ type Stream interface {
 
 	// Open returns a cursor used to read events from this stream.
 	//
-	// offset is the position of the first event to read. The first event
-	// on a stream is always at offset 0.
+	// offset is the position of the first event to read. The first event on a
+	// stream is always at offset 0. If the given offset is beyond the end of a
+	// sealed stream, ErrStreamSealed is returned.
 	//
 	// filter is a set of zero-value event messages, the types of which indicate
 	// which event types are returned by Cursor.Next(). If filter is empty, all
@@ -35,8 +43,9 @@ type Stream interface {
 type Cursor interface {
 	// Next returns the next relevant event in the stream.
 	//
-	// If the end of the stream is reached, it blocks until a relevant event
-	// is appended to the stream, or ctx is canceled.
+	// If the end of the stream is reached it blocks until a relevant event is
+	// appended to the stream, ctx is canceled or the stream is sealed. If the
+	// stream is sealed, ErrStreamSealed is returned.
 	Next(ctx context.Context) (Envelope, error)
 
 	// Close stops the cursor.
@@ -65,10 +74,11 @@ type MemoryStream struct {
 	// The tuple of stream ID and event offset must uniquely identify a message.
 	StreamID string
 
-	m        sync.Mutex
+	m        sync.RWMutex
 	ready    chan struct{}
 	first    uint64
 	next     uint64
+	sealed   bool
 	messages []Envelope
 }
 
@@ -85,8 +95,9 @@ func (s *MemoryStream) ID() string {
 
 // Open returns a cursor used to read events from this stream.
 //
-// offset is the position of the first event to read. The first event
-// on a stream is always at offset 0.
+// offset is the position of the first event to read. The first event on a
+// stream is always at offset 0. If the given offset is beyond the end of a
+// sealed stream, ErrStreamSealed is returned.
 //
 // filter is a set of zero-value event messages, the types of which indicate
 // which event types are returned by Cursor.Next(). If filter is empty, all
@@ -96,6 +107,13 @@ func (s *MemoryStream) Open(
 	offset uint64,
 	filter []dogma.Message,
 ) (Cursor, error) {
+	s.m.RLock()
+	defer s.m.RUnlock()
+
+	if s.sealed && offset >= s.next {
+		return nil, ErrStreamSealed
+	}
+
 	c := &memoryCursor{
 		stream: s,
 		offset: offset,
@@ -110,9 +128,15 @@ func (s *MemoryStream) Open(
 }
 
 // Append appends messages to the end of the stream.
+//
+// It panics if the stream is sealed.
 func (s *MemoryStream) Append(t time.Time, messages ...dogma.Message) {
 	s.m.Lock()
 	defer s.m.Unlock()
+
+	if s.sealed {
+		panic("can not append to sealed stream")
+	}
 
 	for _, m := range messages {
 		env := Envelope{s.next, t, m}
@@ -156,6 +180,23 @@ func (s *MemoryStream) Truncate(offset uint64) uint64 {
 	return count
 }
 
+// Seal marks the stream as sealed, preventing new events from being appended.
+func (s *MemoryStream) Seal() {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	if s.sealed {
+		return
+	}
+
+	s.sealed = true
+
+	if s.ready != nil {
+		close(s.ready)
+		s.ready = nil
+	}
+}
+
 type memoryCursor struct {
 	stream *MemoryStream
 	offset uint64
@@ -167,8 +208,9 @@ var errCursorClosed = errors.New("cursor is closed")
 
 // Next returns the next relevant event in the stream.
 //
-// If the end of the stream is reached, it blocks until a relevant event
-// is appended to the stream, or ctx is canceled.
+// If the end of the stream is reached it blocks until a relevant event is
+// appended to the stream, ctx is canceled or the stream is sealed. If the
+// stream is sealed, ErrStreamSealed is returned.
 func (c *memoryCursor) Next(ctx context.Context) (Envelope, error) {
 	for {
 		select {
@@ -211,6 +253,10 @@ func (c *memoryCursor) Close() error {
 func (c *memoryCursor) get() (Envelope, <-chan struct{}, error) {
 	c.stream.m.Lock()
 	defer c.stream.m.Unlock()
+
+	if c.stream.sealed && c.offset >= c.stream.next {
+		return Envelope{}, nil, ErrStreamSealed
+	}
 
 	if c.offset < c.stream.first {
 		return Envelope{}, nil, fmt.Errorf(
