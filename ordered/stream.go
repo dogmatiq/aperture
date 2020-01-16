@@ -17,7 +17,7 @@ var ErrStreamSealed = errors.New("stream sealed")
 
 // A Stream is an ordered sequence of event messages.
 //
-// Steram implementations may optionally allow for streams to be marked as
+// Stream implementations may optionally allow for streams to be marked as
 // "sealed", indicating that no new messages will appear on the stream.
 type Stream interface {
 	// ID returns a unique identifier for the stream.
