@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 - `Stream.Open()` and `Cursor.Next()` may now return `ErrStreamSealed`
 - `MemoryStream.ID()` will now panic if the `StreamID` field is empty
 - `MemoryStream.Append()` now panics if `Seal()` has been called
+- `MemoryStream.Append()` now panics if any of the given messages is `nil`
 
 ## Fixed
 

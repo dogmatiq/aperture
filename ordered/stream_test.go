@@ -176,6 +176,12 @@ var _ = Describe("type MemoryStream", func() {
 				stream.Append(now, MessageA1)
 			}).To(Panic())
 		})
+
+		It("panics if any of the given messages is nil", func() {
+			Expect(func() {
+				stream.Append(now, MessageA1, nil, MessageA2)
+			}).To(Panic())
+		})
 	})
 
 	Describe("func Truncate()", func() {

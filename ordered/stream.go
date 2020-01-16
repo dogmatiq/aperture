@@ -131,6 +131,12 @@ func (s *MemoryStream) Open(
 //
 // It panics if the stream is sealed.
 func (s *MemoryStream) Append(t time.Time, messages ...dogma.Message) {
+	for _, m := range messages {
+		if m == nil {
+			panic("can not append nil messages")
+		}
+	}
+
 	s.m.Lock()
 	defer s.m.Unlock()
 
