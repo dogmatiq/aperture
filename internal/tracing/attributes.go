@@ -47,5 +47,5 @@ var (
 
 	// MessageRoleEventAttr is a span attribute with the
 	// MessageRole key set to "event".
-	MessageRoleEventAttr = HandlerType.String(message.EventRole.String())
+	MessageRoleEventAttr = MessageRole.String(message.EventRole.String())
 )
