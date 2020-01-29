@@ -32,6 +32,8 @@ github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZm
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/dogmatiq/configkit v0.2.1 h1:i/Wp+mHTXV4L8yOjLfgeiGamPTlw7U6aeM+xRrESaKM=
 github.com/dogmatiq/configkit v0.2.1/go.mod h1:rdU30Lpfc1IbHja7fVd7vBdMshLXDTBrtiZA8dq0rn0=
+github.com/dogmatiq/configkit v0.3.0 h1:DHEhga+cVgGBaNuAKNk1yZMuFsGTkIK+WRLn2B43/mg=
+github.com/dogmatiq/configkit v0.3.0/go.mod h1:rdU30Lpfc1IbHja7fVd7vBdMshLXDTBrtiZA8dq0rn0=
 github.com/dogmatiq/dodeca v0.1.2 h1:A7BK/Uqbah00tCZHeZ8xxCWjLaINt/oXpNwkx+DvA2A=
 github.com/dogmatiq/dodeca v0.1.2/go.mod h1:2lqZWogLVZ2MtiHkQDUJCN9bs0/X9zVY/6HKZaHHLM8=
 github.com/dogmatiq/dogma v0.6.3 h1:owkM3lOFmLmwaFpYogO46taVuPJU5sF5YApICZr4ljk=
