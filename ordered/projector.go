@@ -131,7 +131,7 @@ func (p *Projector) consume(ctx context.Context) error {
 // projection.
 func (p *Projector) open(ctx context.Context) (Cursor, error) {
 	var types []dogma.Message
-	p.types.Each(func(t message.Type) bool {
+	p.types.Range(func(t message.Type) bool {
 		types = append(types, reflect.Zero(t.ReflectType()).Interface())
 		return true
 	})
