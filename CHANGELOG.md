@@ -9,6 +9,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 
+## [0.3.0] - 2020-01-30
+
+## Changed
+
+- **[BC]** Update to `dogmatiq/configkit` v0.3.0
+
 ## [0.2.2] - 2020-01-23
 
 ## Fixed
@@ -53,6 +59,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 [0.2.0]: https://github.com/dogmatiq/aperture/releases/tag/v0.2.0
 [0.2.1]: https://github.com/dogmatiq/aperture/releases/tag/v0.2.1
 [0.2.2]: https://github.com/dogmatiq/aperture/releases/tag/v0.2.2
+[0.3.0]: https://github.com/dogmatiq/aperture/releases/tag/v0.3.0
 
 [Unreleased]: https://github.com/dogmatiq/aperture
 
