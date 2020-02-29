@@ -361,7 +361,7 @@ var _ = Describe("type Projector", func() {
 
 				err := proj.Run(ctx)
 				Expect(err).To(MatchError(
-					"unable to consume from '<id>' for the '<proj>' projection: the persisted version is 1 byte(s), expected 0 or 8",
+					"unable to consume from '<id>' for the '<proj>' projection: version is 1 byte(s), expected 0 or 8",
 				))
 			})
 

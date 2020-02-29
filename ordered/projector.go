@@ -2,12 +2,12 @@ package ordered
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"reflect"
 	"time"
 
 	"github.com/dogmatiq/aperture/internal/tracing"
+	"github.com/dogmatiq/aperture/ordered/resource"
 	"github.com/dogmatiq/configkit"
 	"github.com/dogmatiq/configkit/message"
 	"github.com/dogmatiq/dodeca/logging"
@@ -84,7 +84,7 @@ func (p *Projector) Run(ctx context.Context) (err error) {
 
 	p.name = cfg.Identity().Name
 	p.types = cfg.MessageTypes().Consumed
-	p.resource = []byte(p.Stream.ID())
+	p.resource = resource.FromStreamID(p.Stream.ID())
 
 	p.nameAttr = tracing.HandlerName.String(cfg.Identity().Name)
 	p.keyAttr = tracing.HandlerKey.String(cfg.Identity().Key)
@@ -157,16 +157,9 @@ func (p *Projector) open(ctx context.Context) (Cursor, error) {
 				return err
 			}
 
-			switch len(p.current) {
-			case 0:
-				offset = 0
-			case 8:
-				offset = binary.BigEndian.Uint64(p.current) + 1
-			default:
-				return fmt.Errorf(
-					"the persisted version is %d byte(s), expected 0 or 8",
-					len(p.current),
-				)
+			offset, err = resource.UnmarshalOffset(p.current)
+			if err != nil {
+				return err
 			}
 
 			span.SetAttributes(
@@ -202,7 +195,7 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 		p.next = make([]byte, 8)
 	}
 
-	binary.BigEndian.PutUint64(p.next, env.Offset)
+	resource.MarshalOffsetInto(p.next, env.Offset+1)
 
 	ctx, cancel := linger.ContextWithTimeout(
 		ctx,

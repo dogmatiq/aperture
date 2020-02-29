@@ -9,33 +9,39 @@ The format is based on [Keep a Changelog], and this project adheres to
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 
+## [Unreleased]
+
+### Added
+
+- Add `ordered/resource` package for low-level OCC resource manipulation
+
 ## [0.3.0] - 2020-01-30
 
-## Changed
+### Changed
 
 - **[BC]** Update to `dogmatiq/configkit` v0.3.0
 
 ## [0.2.2] - 2020-01-23
 
-## Fixed
+### Fixed
 
 - Fix collision between `dogma.handler.type` and `dogma.message.role` tracing attributes
 
 ## [0.2.1] - 2020-01-16
 
-## Added
+### Added
 
 - Add `ordered.ErrStreamSealed`
 - Add `MemoryStream.Seal()`
 
-## Changed
+### Changed
 
 - `Stream.Open()` and `Cursor.Next()` may now return `ErrStreamSealed`
 - `MemoryStream.ID()` now panics if the `StreamID` field is empty
 - `MemoryStream.Append()` now panics if `Seal()` has been called
 - `MemoryStream.Append()` now panics if any of the given messages is `nil`
 
-## Fixed
+### Fixed
 
 - Fix unconditional OCC failure in `ordered.Projector`
 
