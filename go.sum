@@ -11,6 +11,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dogmatiq/configkit v0.4.0 h1:Y6/p6Ny3Rf8NGy9mXIIRE7Zz/MMHM4J/W3AObE3Ia2g=
 github.com/dogmatiq/configkit v0.4.0/go.mod h1:EUtTfJRyCRiM3Vn2yTN8P9Rk3C7aW3n0t+4nKwcIKHg=
+github.com/dogmatiq/configkit v0.4.1 h1:RfZTNFKaoXLtaEY++fSBFripxaQXKQ/3RUuSnt92Fgc=
+github.com/dogmatiq/configkit v0.4.1/go.mod h1:jksKTde33ZnNdgEDpPmawSIeWsPvH8oxDgQjcwdZdj8=
 github.com/dogmatiq/dodeca v0.2.0 h1:1Y/NtxUVEtaDpGcbYA0XQR6Sop2eTzpHbN3KjWets04=
 github.com/dogmatiq/dodeca v0.2.0/go.mod h1:YjUCbfmgl08gQ4QPNA0Dp9f+ge6kImQ7PgVM5K7Jtn0=
 github.com/dogmatiq/dodeca v0.2.1 h1:zc/bwYY5D1QkadQOKVEv5zXhiu+f+28kjQR1B0O2faE=
