@@ -18,6 +18,8 @@ github.com/dogmatiq/configkit v0.4.2 h1:kUfzcQ0xif/uOPg+gAwzN/AwQ+BumHcrGbqv+xQS
 github.com/dogmatiq/configkit v0.4.2/go.mod h1:+2OsCco+kVaHQQFMXn56sYDP+Yre4QODYvBAmBr+5EE=
 github.com/dogmatiq/configkit v0.7.1 h1:Qe1/FiPyx0J4pCRH+jQiRRaWuJfd0b9EY4o3K60gtP8=
 github.com/dogmatiq/configkit v0.7.1/go.mod h1:5PjrZ1G2OByNzuSzSIks/Q9jFu8LNx1zC5Q6emSQEuc=
+github.com/dogmatiq/configkit v0.7.2 h1:8CNsybxJL94k3BCHf+xtrmvsX5IaqcAzBRQt4+yqiGY=
+github.com/dogmatiq/configkit v0.7.2/go.mod h1:W0N9v/EfQBqQ80tbv6cV+qIsqQqk9i1hcAYnrysBB/8=
 github.com/dogmatiq/dodeca v0.2.0 h1:1Y/NtxUVEtaDpGcbYA0XQR6Sop2eTzpHbN3KjWets04=
 github.com/dogmatiq/dodeca v0.2.0/go.mod h1:YjUCbfmgl08gQ4QPNA0Dp9f+ge6kImQ7PgVM5K7Jtn0=
 github.com/dogmatiq/dodeca v0.2.1 h1:zc/bwYY5D1QkadQOKVEv5zXhiu+f+28kjQR1B0O2faE=
