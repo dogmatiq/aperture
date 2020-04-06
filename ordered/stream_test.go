@@ -344,6 +344,28 @@ var _ = Describe("type MemoryStream", func() {
 					_, err = cur.Next(ctx)
 					Expect(err).To(Equal(ErrStreamSealed))
 				})
+
+				It("does not hang when filtering historical events", func() {
+					// This is a regression test for
+					// https://github.com/dogmatiq/aperture/issues/41.
+					//
+					// This issue occurs when a cursor is skipping over
+					// historical events that do not match the type filter
+					// before reaching the end.
+					ctx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+					defer cancel()
+
+					stream.Seal()
+
+					// We ask for messages of type MessageC, which do not appear
+					// on the stream. We start as offset 3 so the cursor is
+					// forced to filter the MessageB event in that position.
+					cur, err := stream.Open(ctx, 3, []dogma.Message{MessageC{}})
+					Expect(err).ShouldNot(HaveOccurred())
+
+					_, err = cur.Next(ctx)
+					Expect(err).To(Equal(ErrStreamSealed))
+				})
 			})
 		})
 	})
