@@ -260,10 +260,6 @@ func (c *memoryCursor) get() (Envelope, <-chan struct{}, error) {
 	c.stream.m.Lock()
 	defer c.stream.m.Unlock()
 
-	if c.stream.sealed && c.offset >= c.stream.next {
-		return Envelope{}, nil, ErrStreamSealed
-	}
-
 	if c.offset < c.stream.first {
 		return Envelope{}, nil, fmt.Errorf(
 			"can not read truncated event at offset %d, the first available offset is %d",
@@ -281,6 +277,10 @@ func (c *memoryCursor) get() (Envelope, <-chan struct{}, error) {
 		}
 
 		return env, nil, nil
+	}
+
+	if c.stream.sealed {
+		return Envelope{}, nil, ErrStreamSealed
 	}
 
 	if c.stream.ready == nil {
