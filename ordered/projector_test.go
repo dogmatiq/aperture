@@ -9,6 +9,7 @@ import (
 	"github.com/dogmatiq/dodeca/logging"
 	"github.com/dogmatiq/dogma"
 	. "github.com/dogmatiq/dogma/fixtures"
+	. "github.com/jmalloc/gomegax"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"go.opentelemetry.io/otel/api/metric"
@@ -202,6 +203,44 @@ var _ = Describe("type Projector", func() {
 			cancel()
 			err := <-done
 			Expect(err).To(Equal(context.Canceled))
+		})
+
+		It("logs information about the current message during dogma.UnexpectedMessage panic", func() {
+			handler.HandleEventFunc = func(
+				_ context.Context,
+				_, _, _ []byte,
+				s dogma.ProjectionEventScope,
+				_ dogma.Message,
+			) (bool, error) {
+				panic(dogma.UnexpectedMessage)
+			}
+
+			Expect(func() {
+				err := proj.Run(ctx)
+				Expect(err).ShouldNot(HaveOccurred())
+			}).To(PanicWith(dogma.UnexpectedMessage))
+
+			Expect(logger.Messages()).To(ContainElement(
+				logging.BufferedLogMessage{
+					Message: "[<proj> <id>@0] unexpected message: fixtures.MessageA",
+				},
+			))
+		})
+
+		It("does not silence unrecognized panic values", func() {
+			handler.HandleEventFunc = func(
+				_ context.Context,
+				_, _, _ []byte,
+				s dogma.ProjectionEventScope,
+				_ dogma.Message,
+			) (bool, error) {
+				panic("<panic>")
+			}
+
+			Expect(func() {
+				err := proj.Run(ctx)
+				Expect(err).ShouldNot(HaveOccurred())
+			}).To(PanicWith("<panic>"))
 		})
 
 		Context("scope", func() {
