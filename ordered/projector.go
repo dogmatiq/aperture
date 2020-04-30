@@ -225,6 +225,8 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 				tracing.MessageRecordedAt.String(env.RecordedAt.Format(time.RFC3339Nano)),
 			)
 
+			defer p.logUnexpectedMessage(env)
+
 			var err error
 			start := time.Now()
 			ok, err = p.Handler.HandleEvent(
@@ -275,4 +277,25 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (p *Projector) logUnexpectedMessage(env Envelope) {
+	v := recover()
+
+	if v == nil {
+		return
+	}
+
+	if v == dogma.UnexpectedMessage {
+		logging.Log(
+			p.Logger,
+			"[%s %s@%d] unexpected message: %T",
+			p.name,
+			p.resource,
+			env.Offset,
+			env.Message,
+		)
+	}
+
+	panic(v)
 }

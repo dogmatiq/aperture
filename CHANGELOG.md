@@ -9,6 +9,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 
+## [Unreleased]
+
+### Added
+
+- Log the message type and offset when a `dogma.UnexpectedMessage` panic occurs
+
 ## [0.3.2] - 2020-04-06
 
 ### Fixed
