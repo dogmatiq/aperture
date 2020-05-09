@@ -7,7 +7,6 @@ require (
 	github.com/dogmatiq/dodeca v0.2.1
 	github.com/dogmatiq/dogma v0.6.3
 	github.com/dogmatiq/linger v0.2.1
-	github.com/jmalloc/gomegax v0.0.0-20200417012726-d7192fca6e53
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.10.0
 	go.opentelemetry.io/otel v0.2.3
