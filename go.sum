@@ -14,6 +14,8 @@ github.com/dogmatiq/configkit v0.7.3 h1:eBHy935dueFudD/Tiza/L0G9pLjMPHCWyOu3Fpiu
 github.com/dogmatiq/configkit v0.7.3/go.mod h1:6N9vf4pAVxqrkSXHOpa6ZvDty8MnTqAopoDdRfeAGi0=
 github.com/dogmatiq/dodeca v0.2.1 h1:zc/bwYY5D1QkadQOKVEv5zXhiu+f+28kjQR1B0O2faE=
 github.com/dogmatiq/dodeca v0.2.1/go.mod h1:YjUCbfmgl08gQ4QPNA0Dp9f+ge6kImQ7PgVM5K7Jtn0=
+github.com/dogmatiq/dodeca v0.2.2 h1:mxlHJSnaWc++JBp19o9invtEDG1sZy6q38697nnm5S8=
+github.com/dogmatiq/dodeca v0.2.2/go.mod h1:nrNDPFJiRLeBL3Ycyh6ZLs1ZgktpWS18Tze9qjXzTfg=
 github.com/dogmatiq/dogma v0.6.3 h1:owkM3lOFmLmwaFpYogO46taVuPJU5sF5YApICZr4ljk=
 github.com/dogmatiq/dogma v0.6.3/go.mod h1:8TdjQ5jjV2DcCPb/jjHPgSrqU66H6092yMEIF5HGx0g=
 github.com/dogmatiq/iago v0.4.0 h1:57nZqVT34IZxtCZEW/RFif7DNUEjMXgevfr/Mmd0N8I=
