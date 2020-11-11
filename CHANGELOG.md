@@ -9,6 +9,16 @@ The format is based on [Keep a Changelog], and this project adheres to
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 
+## [Unreleased]
+
+### Changed
+
+- **[BC]** Updated Dogma to v0.10.0
+
+### Added
+
+- Added support for projection compaction to `ordered.Projector`
+
 ## [0.3.3] - 2020-04-30
 
 ### Added

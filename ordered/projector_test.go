@@ -185,6 +185,39 @@ var _ = Describe("type Projector", func() {
 			))
 		})
 
+		It("returns an error if the handler returns an error while compacting", func() {
+			handler.CompactFunc = func(
+				context.Context,
+				dogma.ProjectionCompactScope,
+			) error {
+				return errors.New("<error>")
+			}
+
+			err := proj.Run(ctx)
+			Expect(err).To(MatchError(
+				"unable to compact the '<proj>' projection: <error>",
+			))
+		})
+
+		It("does not return an error if the compaction exceeds the deadline", func() {
+			handler.CompactFunc = func(
+				context.Context,
+				dogma.ProjectionCompactScope,
+			) error {
+				defer cancel()
+				return context.DeadlineExceeded
+			}
+
+			err := proj.Run(ctx)
+			Expect(err).To(Equal(context.Canceled))
+
+			Expect(logger.Messages()).To(ContainElement(
+				logging.BufferedLogMessage{
+					Message: "[<proj> compact] context deadline exceeded",
+				},
+			))
+		})
+
 		It("returns an error if the handler configuration is invalid", func() {
 			handler.ConfigureFunc = nil
 			err := proj.Run(ctx)
@@ -204,7 +237,7 @@ var _ = Describe("type Projector", func() {
 			Expect(err).To(Equal(context.Canceled))
 		})
 
-		Context("scope", func() {
+		Context("event scope", func() {
 			It("exposes the time that the event was recorded", func() {
 				handler.HandleEventFunc = func(
 					_ context.Context,
@@ -239,6 +272,28 @@ var _ = Describe("type Projector", func() {
 				Expect(logger.Messages()).To(ContainElement(
 					logging.BufferedLogMessage{
 						Message: "[<proj> <id>@0] format <value>",
+					},
+				))
+			})
+		})
+
+		Context("compact scope", func() {
+			It("logs messages to the logger", func() {
+				handler.CompactFunc = func(
+					_ context.Context,
+					s dogma.ProjectionCompactScope,
+				) error {
+					s.Log("format %s", "<value>")
+					cancel()
+					return nil
+				}
+
+				err := proj.Run(ctx)
+				Expect(err).To(Equal(context.Canceled))
+
+				Expect(logger.Messages()).To(ContainElement(
+					logging.BufferedLogMessage{
+						Message: "[<proj> compact] format <value>",
 					},
 				))
 			})
