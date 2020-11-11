@@ -204,44 +204,6 @@ var _ = Describe("type Projector", func() {
 			Expect(err).To(Equal(context.Canceled))
 		})
 
-		It("logs information about the current message during dogma.UnexpectedMessage panic", func() {
-			handler.HandleEventFunc = func(
-				_ context.Context,
-				_, _, _ []byte,
-				s dogma.ProjectionEventScope,
-				_ dogma.Message,
-			) (bool, error) {
-				panic(dogma.UnexpectedMessage)
-			}
-
-			Expect(func() {
-				err := proj.Run(ctx)
-				Expect(err).ShouldNot(HaveOccurred())
-			}).To(PanicWith(dogma.UnexpectedMessage))
-
-			Expect(logger.Messages()).To(ContainElement(
-				logging.BufferedLogMessage{
-					Message: "[<proj> <id>@0] unexpected message: fixtures.MessageA",
-				},
-			))
-		})
-
-		It("does not silence unrecognized panic values", func() {
-			handler.HandleEventFunc = func(
-				_ context.Context,
-				_, _, _ []byte,
-				s dogma.ProjectionEventScope,
-				_ dogma.Message,
-			) (bool, error) {
-				panic("<panic>")
-			}
-
-			Expect(func() {
-				err := proj.Run(ctx)
-				Expect(err).ShouldNot(HaveOccurred())
-			}).To(PanicWith("<panic>"))
-		})
-
 		Context("scope", func() {
 			It("exposes the time that the event was recorded", func() {
 				handler.HandleEventFunc = func(

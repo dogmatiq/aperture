@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/dogmatiq/aperture/internal/explainpanic"
 	"github.com/dogmatiq/aperture/internal/tracing"
 	"github.com/dogmatiq/aperture/ordered/resource"
 	"github.com/dogmatiq/configkit"
@@ -197,9 +198,19 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 
 	resource.MarshalOffsetInto(p.next, env.Offset+1)
 
+	var hint time.Duration
+	explainpanic.UnexpectedMessage(
+		p.Handler,
+		"TimeoutHint",
+		env.Message,
+		func() {
+			hint = p.Handler.TimeoutHint(env.Message)
+		},
+	)
+
 	ctx, cancel := linger.ContextWithTimeout(
 		ctx,
-		p.Handler.TimeoutHint(env.Message),
+		hint,
 		p.DefaultTimeout,
 		DefaultTimeout,
 	)
@@ -225,24 +236,30 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 				tracing.MessageRecordedAt.String(env.RecordedAt.Format(time.RFC3339Nano)),
 			)
 
-			defer p.logUnexpectedMessage(env)
-
-			var err error
 			start := time.Now()
-			ok, err = p.Handler.HandleEvent(
-				ctx,
-				p.resource,
-				p.current,
-				p.next,
-				scope{
-					resource:   p.resource,
-					offset:     env.Offset,
-					handler:    p.name,
-					recordedAt: env.RecordedAt,
-					logger:     p.Logger,
-				},
+
+			explainpanic.UnexpectedMessage(
+				p.Handler,
+				"HandleEvent",
 				env.Message,
+				func() {
+					ok, err = p.Handler.HandleEvent(
+						ctx,
+						p.resource,
+						p.current,
+						p.next,
+						scope{
+							resource:   p.resource,
+							offset:     env.Offset,
+							handler:    p.name,
+							recordedAt: env.RecordedAt,
+							logger:     p.Logger,
+						},
+						env.Message,
+					)
+				},
 			)
+
 			if p.Metrics != nil {
 				p.Metrics.HandleTimeMeasure.Record(ctx, time.Since(start).Seconds())
 			}
@@ -277,25 +294,4 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 	}
 
 	return false, nil
-}
-
-func (p *Projector) logUnexpectedMessage(env Envelope) {
-	v := recover()
-
-	if v == nil {
-		return
-	}
-
-	if v == dogma.UnexpectedMessage {
-		logging.Log(
-			p.Logger,
-			"[%s %s@%d] unexpected message: %T",
-			p.name,
-			p.resource,
-			env.Offset,
-			env.Message,
-		)
-	}
-
-	panic(v)
 }
