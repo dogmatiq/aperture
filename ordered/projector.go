@@ -17,10 +17,21 @@ import (
 	"go.opentelemetry.io/otel/api/core"
 	"go.opentelemetry.io/otel/api/metric"
 	"go.opentelemetry.io/otel/api/trace"
+	"golang.org/x/sync/errgroup"
 )
 
-// DefaultTimeout is the default timeout to use when applying an event.
-const DefaultTimeout = 3 * time.Second
+const (
+	// DefaultTimeout is the default timeout to use when applying an event.
+	DefaultTimeout = 3 * time.Second
+
+	// DefaultCompactionInterval is the default interval at which a projector
+	// will compact its projection.
+	DefaultCompactionInterval = 24 * time.Hour
+
+	// DefaultCompactionTimeout is the default timeout to use when compacting a
+	// projection.
+	DefaultCompactionTimeout = 5 * time.Minute
+)
 
 // ProjectorMetrics encapsulates the metrics collected by a Projector.
 type ProjectorMetrics struct {
@@ -54,6 +65,16 @@ type Projector struct {
 	// DefaultTimeout constant is used.
 	DefaultTimeout time.Duration
 
+	// CompactionInterval is the interval at which the projector compacts the
+	// projection. If it is zero the global DefaultCompactionInterval constant
+	// is used.
+	CompactionInterval time.Duration
+
+	// DefaultCompactionTimeout is the default timeout to use when compacting
+	// the projection. If it is zero the global DefaultCompactionTimeout is
+	// used.
+	CompactionTimeout time.Duration
+
 	// Metrics contains the metrics recorded by the projector. If it is nil no
 	// metrics are recorded.
 	Metrics *ProjectorMetrics
@@ -72,12 +93,19 @@ type Projector struct {
 	streamAttr core.KeyValue
 }
 
-// Run applies events to a projection until ctx is canceled or an error occurs.
+// Run runs the projection until ctx is canceled or an error occurs.
+//
+// Event messages are obtained from the stream and passed to the handler for
+// handling as they become available. Projection compaction is performed at a
+// fixed interval.
 //
 // If message handling fails due to an optimistic concurrency conflict within
-// the projection the consumer restarts automatically. Any other error is
-// returned, in which case it is the caller's responsibility to implement any
-// retry logic. Run() can safely be called again after exiting with an error.
+// the projection the consumer restarts automatically.
+//
+// Run() returns if any other error occurs during handling or compaction, in
+// which case it is the caller's responsibility to implement any retry logic.
+//
+// Run() can safely be called again after exiting with an error.
 func (p *Projector) Run(ctx context.Context) (err error) {
 	defer configkit.Recover(&err)
 
@@ -91,12 +119,31 @@ func (p *Projector) Run(ctx context.Context) (err error) {
 	p.keyAttr = tracing.HandlerKey.String(cfg.Identity().Key)
 	p.streamAttr = tracing.StreamID.String(p.Stream.ID())
 
-	for {
-		if err := p.consume(ctx); err != nil {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
+	g, gctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		for {
+			if err := p.compact(gctx); err != nil {
+				return fmt.Errorf(
+					"unable to compact the '%s' projection: %w",
+					p.name,
+					err,
+				)
+			}
+
+			if err := linger.Sleep(
+				gctx,
+				p.CompactionInterval,
+				DefaultCompactionInterval,
+			); err != nil {
+				return err
+			}
+		}
+	})
+
+	g.Go(func() error {
+		for {
+			if err := p.consume(gctx); err != nil {
 				return fmt.Errorf(
 					"unable to consume from '%s' for the '%s' projection: %w",
 					p.Stream.ID(),
@@ -105,6 +152,16 @@ func (p *Projector) Run(ctx context.Context) (err error) {
 				)
 			}
 		}
+	})
+
+	err = g.Wait()
+
+	select {
+	case <-ctx.Done():
+		// Don't wrap the error at all if we have been asked to bail.
+		return ctx.Err()
+	default:
+		return err
 	}
 }
 
@@ -223,7 +280,7 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 		ctx,
 		p.Tracer,
 		mt,
-		func(ctx context.Context) error {
+		func(ctx context.Context) (err error) {
 			trace.SpanFromContext(ctx).SetAttributes(
 				p.nameAttr,
 				p.keyAttr,
@@ -248,7 +305,7 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 						p.resource,
 						p.current,
 						p.next,
-						scope{
+						eventScope{
 							resource:   p.resource,
 							offset:     env.Offset,
 							handler:    p.name,
@@ -294,4 +351,43 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// compact calls p.Handler.Compact() with a timeout as per p.CompactionTimeout.
+//
+// It returns an error if ctx is canceled or some unexpected error occurs. It is
+// *not* an error if compaction times out. It is simply retried again at the
+// next interval.
+func (p *Projector) compact(ctx context.Context) error {
+	ctx, cancel := linger.ContextWithTimeout(
+		ctx,
+		p.CompactionTimeout,
+		DefaultCompactionTimeout,
+	)
+	defer cancel()
+
+	if err := p.Handler.Compact(
+		ctx,
+		compactScope{
+			handler: p.name,
+			logger:  p.Logger,
+		},
+	); err != nil {
+		if err != context.DeadlineExceeded {
+			// The error was something other than a timeout of the compaction
+			// process itself.
+			return err
+		}
+
+		// Otherwise, the compaction timed out, but this is allowed. Log about
+		// it but continue as normal.
+		logging.Log(
+			p.Logger,
+			"[%s compact] %s",
+			p.name,
+			err,
+		)
+	}
+
+	return nil
 }
