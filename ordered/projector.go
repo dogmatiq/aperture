@@ -70,9 +70,8 @@ type Projector struct {
 	// is used.
 	CompactionInterval time.Duration
 
-	// DefaultCompactionTimeout is the default timeout to use when compacting
-	// the projection. If it is zero the global DefaultCompactionTimeout is
-	// used.
+	// CompactionTimeout is the default timeout to use when compacting the
+	// projection. If it is zero the global DefaultCompactionTimeout is used.
 	CompactionTimeout time.Duration
 
 	// Metrics contains the metrics recorded by the projector. If it is nil no
