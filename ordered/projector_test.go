@@ -297,6 +297,21 @@ var _ = Describe("type Projector", func() {
 					},
 				))
 			})
+
+			It("exposes the current time", func() {
+				handler.CompactFunc = func(
+					_ context.Context,
+					s dogma.ProjectionCompactScope,
+				) error {
+					t := s.Now()
+					Expect(t).To(BeTemporally("~", time.Now()))
+					cancel()
+					return nil
+				}
+
+				err := proj.Run(ctx)
+				Expect(err).To(Equal(context.Canceled))
+			})
 		})
 
 		Context("optimistic concurrency control", func() {

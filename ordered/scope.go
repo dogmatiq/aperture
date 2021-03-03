@@ -50,3 +50,8 @@ func (s compactScope) Log(f string, v ...interface{}) {
 		fmt.Sprintf(f, v...),
 	)
 }
+
+// Now returns the current time.
+func (s compactScope) Now() time.Time {
+	return time.Now()
+}
