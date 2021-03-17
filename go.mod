@@ -9,6 +9,6 @@ require (
 	github.com/dogmatiq/linger v0.2.1
 	github.com/onsi/ginkgo v1.15.2
 	github.com/onsi/gomega v1.11.0
-	go.opentelemetry.io/otel v0.2.3
+	go.opentelemetry.io/otel v0.18.0
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 )
