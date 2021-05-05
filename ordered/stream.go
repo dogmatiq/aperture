@@ -204,10 +204,11 @@ func (s *MemoryStream) Seal() {
 }
 
 type memoryCursor struct {
-	stream *MemoryStream
-	offset uint64
-	filter message.TypeSet
-	closed chan struct{}
+	stream    *MemoryStream
+	offset    uint64
+	filter    message.TypeSet
+	closeOnce sync.Once
+	closed    chan struct{}
 }
 
 var errCursorClosed = errors.New("cursor is closed")
@@ -247,11 +248,9 @@ func (c *memoryCursor) Next(ctx context.Context) (Envelope, error) {
 //
 // Any current or future calls to Next() return a non-nil error.
 func (c *memoryCursor) Close() error {
-	defer func() {
-		recover()
-	}()
-
-	close(c.closed)
+	c.closeOnce.Do(func() {
+		close(c.closed)
+	})
 
 	return nil
 }
