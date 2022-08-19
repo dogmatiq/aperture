@@ -11,12 +11,10 @@ import (
 	. "github.com/dogmatiq/dogma/fixtures"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"go.opentelemetry.io/otel/api/metric"
 )
 
 var _ = Describe("type Projector", func() {
 	var (
-		meter   metric.NoopMeter
 		now     time.Time
 		ctx     context.Context
 		cancel  func()
@@ -56,28 +54,15 @@ var _ = Describe("type Projector", func() {
 
 		logger = &logging.BufferedLogger{}
 
-		handleTimeMeasure := meter.NewFloat64Measure("")
-		conflictCount := meter.NewInt64Counter("")
-		offsetGauge := meter.NewInt64Gauge("")
-
 		proj = &Projector{
 			Stream:  stream,
 			Handler: handler,
 			Logger:  logger,
-			Metrics: &ProjectorMetrics{
-				HandleTimeMeasure: handleTimeMeasure.Bind(nil),
-				ConflictCount:     conflictCount.Bind(nil),
-				OffsetGauge:       offsetGauge.Bind(nil),
-			},
 		}
 	})
 
 	AfterEach(func() {
 		cancel()
-
-		proj.Metrics.HandleTimeMeasure.Unbind()
-		proj.Metrics.ConflictCount.Unbind()
-		proj.Metrics.OffsetGauge.Unbind()
 	})
 
 	Describe("func Run()", func() {
@@ -179,7 +164,7 @@ var _ = Describe("type Projector", func() {
 				return false, errors.New("<error>")
 			}
 
-			err := proj.Run(ctx)
+			err := proj.Run(context.Background())
 			Expect(err).To(MatchError(
 				"unable to consume from '<id>' for the '<proj>' projection: <error>",
 			))

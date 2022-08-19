@@ -7,16 +7,12 @@ import (
 	"time"
 
 	"github.com/dogmatiq/aperture/internal/explainpanic"
-	"github.com/dogmatiq/aperture/internal/tracing"
 	"github.com/dogmatiq/aperture/ordered/resource"
 	"github.com/dogmatiq/configkit"
 	"github.com/dogmatiq/configkit/message"
 	"github.com/dogmatiq/dodeca/logging"
 	"github.com/dogmatiq/dogma"
 	"github.com/dogmatiq/linger"
-	"go.opentelemetry.io/otel/api/core"
-	"go.opentelemetry.io/otel/api/metric"
-	"go.opentelemetry.io/otel/api/trace"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -32,21 +28,6 @@ const (
 	// projection.
 	DefaultCompactionTimeout = 5 * time.Minute
 )
-
-// ProjectorMetrics encapsulates the metrics collected by a Projector.
-type ProjectorMetrics struct {
-	// HandleTimeMeasure is the bound metric used to record the amount of time
-	// spent handling each message, in seconds.
-	HandleTimeMeasure metric.BoundFloat64Measure
-
-	// ConflictCount is the bound metric used to record the number of OCC
-	// conflicts that occur while attempting to handle messages.
-	ConflictCount metric.BoundInt64Counter
-
-	// OffsetGauge is the bound handle used to record last offset that was
-	// successfully applied to the projection.
-	OffsetGauge metric.BoundInt64Gauge
-}
 
 // Projector reads events from a stream and applies them to a projection.
 type Projector struct {
@@ -74,22 +55,11 @@ type Projector struct {
 	// projection. If it is zero the global DefaultCompactionTimeout is used.
 	CompactionTimeout time.Duration
 
-	// Metrics contains the metrics recorded by the projector. If it is nil no
-	// metrics are recorded.
-	Metrics *ProjectorMetrics
-
-	// Tracer is used to record tracing spans. If it is nil, no tracing is
-	// performed.
-	Tracer trace.Tracer
-
-	name       string
-	types      message.TypeCollection
-	resource   []byte
-	current    []byte
-	next       []byte
-	nameAttr   core.KeyValue
-	keyAttr    core.KeyValue
-	streamAttr core.KeyValue
+	name     string
+	types    message.TypeCollection
+	resource []byte
+	current  []byte
+	next     []byte
 }
 
 // Run runs the projection until ctx is canceled or an error occurs.
@@ -113,10 +83,6 @@ func (p *Projector) Run(ctx context.Context) (err error) {
 	p.name = cfg.Identity().Name
 	p.types = cfg.MessageTypes().Consumed
 	p.resource = resource.FromStreamID(p.Stream.ID())
-
-	p.nameAttr = tracing.HandlerName.String(cfg.Identity().Name)
-	p.keyAttr = tracing.HandlerKey.String(cfg.Identity().Key)
-	p.streamAttr = tracing.StreamID.String(p.Stream.ID())
 
 	g, gctx := errgroup.WithContext(ctx)
 
@@ -193,39 +159,17 @@ func (p *Projector) open(ctx context.Context) (Cursor, error) {
 		return true
 	})
 
-	var offset uint64
+	var (
+		offset uint64
+		err    error
+	)
+	p.current, err = p.Handler.ResourceVersion(ctx, p.resource)
+	if err != nil {
+		return nil, err
+	}
 
-	if err := tracing.WithSpan(
-		ctx,
-		p.Tracer,
-		"query last offset",
-		func(ctx context.Context) error {
-			span := trace.SpanFromContext(ctx)
-			span.SetAttributes(
-				p.nameAttr,
-				p.keyAttr,
-				tracing.HandlerTypeProjectionAttr,
-				p.streamAttr,
-			)
-
-			var err error
-			p.current, err = p.Handler.ResourceVersion(ctx, p.resource)
-			if err != nil {
-				return err
-			}
-
-			offset, err = resource.UnmarshalOffset(p.current)
-			if err != nil {
-				return err
-			}
-
-			span.SetAttributes(
-				tracing.StreamOffset.Uint64(offset),
-			)
-
-			return nil
-		},
-	); err != nil {
+	offset, err = resource.UnmarshalOffset(p.current)
+	if err != nil {
 		return nil, err
 	}
 
@@ -272,68 +216,35 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 	)
 	defer cancel()
 
-	mt := message.TypeOf(env.Message).String()
-
 	var ok bool
-	if err := tracing.WithSpan(
-		ctx,
-		p.Tracer,
-		mt,
-		func(ctx context.Context) (err error) {
-			trace.SpanFromContext(ctx).SetAttributes(
-				p.nameAttr,
-				p.keyAttr,
-				tracing.HandlerTypeProjectionAttr,
-				p.streamAttr,
-				tracing.StreamOffset.Uint64(env.Offset),
-				tracing.MessageType.String(mt),
-				tracing.MessageRoleEventAttr,
-				tracing.MessageDescription.String(dogma.DescribeMessage(env.Message)),
-				tracing.MessageRecordedAt.String(env.RecordedAt.Format(time.RFC3339Nano)),
-			)
-
-			start := time.Now()
-
-			explainpanic.UnexpectedMessage(
-				p.Handler,
-				"HandleEvent",
-				env.Message,
-				func() {
-					ok, err = p.Handler.HandleEvent(
-						ctx,
-						p.resource,
-						p.current,
-						p.next,
-						eventScope{
-							resource:   p.resource,
-							offset:     env.Offset,
-							handler:    p.name,
-							recordedAt: env.RecordedAt,
-							logger:     p.Logger,
-						},
-						env.Message,
-					)
+	explainpanic.UnexpectedMessage(
+		p.Handler,
+		"HandleEvent",
+		env.Message,
+		func() {
+			ok, err = p.Handler.HandleEvent(
+				ctx,
+				p.resource,
+				p.current,
+				p.next,
+				eventScope{
+					resource:   p.resource,
+					offset:     env.Offset,
+					handler:    p.name,
+					recordedAt: env.RecordedAt,
+					logger:     p.Logger,
 				},
+				env.Message,
 			)
-
-			if p.Metrics != nil {
-				p.Metrics.HandleTimeMeasure.Record(ctx, time.Since(start).Seconds())
-			}
-
-			return err
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return false, err
 	}
 
 	if ok {
 		// keep swapping between the two buffers to avoid repeat allocations
 		p.current, p.next = p.next, p.current
-
-		if p.Metrics != nil {
-			p.Metrics.OffsetGauge.Set(ctx, int64(env.Offset))
-		}
-
 		return true, nil
 	}
 
@@ -344,10 +255,6 @@ func (p *Projector) consumeNext(ctx context.Context, cur Cursor) (bool, error) {
 		p.resource,
 		env.Offset,
 	)
-
-	if p.Metrics != nil {
-		p.Metrics.ConflictCount.Add(ctx, 1)
-	}
 
 	return false, nil
 }
