@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/dogmatiq/configkit v0.11.1
 	github.com/dogmatiq/dodeca v1.4.2
-	github.com/dogmatiq/dogma v0.11.1
+	github.com/dogmatiq/dogma v0.12.0
 	github.com/dogmatiq/linger v1.1.0
 	github.com/onsi/ginkgo/v2 v2.9.4
 	github.com/onsi/gomega v1.27.6
