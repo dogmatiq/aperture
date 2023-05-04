@@ -9,7 +9,7 @@ require (
 	github.com/dogmatiq/linger v1.1.0
 	github.com/onsi/ginkgo/v2 v2.9.3
 	github.com/onsi/gomega v1.27.6
-	golang.org/x/sync v0.1.0
+	golang.org/x/sync v0.2.0
 )
 
 require (
