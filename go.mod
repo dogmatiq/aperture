@@ -8,7 +8,7 @@ require (
 	github.com/dogmatiq/dogma v0.12.0
 	github.com/dogmatiq/linger v1.1.0
 	github.com/onsi/ginkgo/v2 v2.9.7
-	github.com/onsi/gomega v1.27.7
+	github.com/onsi/gomega v1.27.8
 	golang.org/x/sync v0.2.0
 )
 
