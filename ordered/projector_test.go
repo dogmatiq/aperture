@@ -47,7 +47,7 @@ var _ = Describe("type Projector", func() {
 
 		handler = &ProjectionMessageHandler{
 			ConfigureFunc: func(c dogma.ProjectionConfigurer) {
-				c.Identity("<proj>", "<proj-key>")
+				c.Identity("<proj>", "45804515-8b41-4d23-97b1-0cda5a0d782c")
 				c.ConsumesEventType(MessageA{})
 			},
 		}

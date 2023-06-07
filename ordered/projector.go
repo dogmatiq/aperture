@@ -155,7 +155,10 @@ func (p *Projector) consume(ctx context.Context) error {
 func (p *Projector) open(ctx context.Context) (Cursor, error) {
 	var types []dogma.Message
 	p.types.Range(func(t message.Type) bool {
-		types = append(types, reflect.Zero(t.ReflectType()).Interface())
+		types = append(
+			types,
+			reflect.Zero(t.ReflectType()).Interface().(dogma.Message),
+		)
 		return true
 	})
 
