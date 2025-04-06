@@ -9,7 +9,7 @@ require (
 	github.com/dogmatiq/dogma v0.15.0
 	github.com/dogmatiq/linger v1.1.0
 	github.com/onsi/ginkgo/v2 v2.23.4
-	github.com/onsi/gomega v1.36.3
+	github.com/onsi/gomega v1.37.0
 	golang.org/x/sync v0.12.0
 )
 
